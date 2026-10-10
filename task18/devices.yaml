@@ -1,0 +1,6 @@
+- device_type: cisco_ios
+  host: sandbox-iosxe-latest-1.cisco.com
+  username: admin
+  password: C1sco12345
+  secret: C1sco12345
+  port: 22
