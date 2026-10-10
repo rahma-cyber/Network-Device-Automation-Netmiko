@@ -1,16 +1,13 @@
-# Rapport d'Exercices — Section 18 : Connexion aux Équipements Réseau avec Netmiko
+# Rapport de Travaux Pratiques — Section 18 : Automatisation avec Netmiko
 
-## 1. Description du Travail
-Ce document présente la résolution des exercices pratiques de la section 18, visant à automatiser l'exécution de commandes de supervision (*Show*) et de configuration sur des équipements réseau Cisco via le protocole SSH en utilisant la bibliothèque **Netmiko**.
+## 1. Introduction et Environnement
+Ce rapport documente la résolution progressive des tâches d'automatisation de la section 18 [1.112]. L'objectif est d'utiliser la bibliothèque **Netmiko** pour s'interconnecter en SSH avec l'équipement **Cisco Devnet Sandbox** (`://cisco.com`) afin d'exécuter des commandes de supervision et de configuration [1.112].
 
----
-
-## 2. Fichier de Configuration (devices.yaml)
-Ce fichier centralise les paramètres d'accès SSH pour le routeur Cisco Devnet Sandbox fourni.
-
+### 1.1 Structure des équipements (`devices.yaml`)
+Les informations d'accès de l'équipement sont centralisées dans un fichier YAML [1.112] :
 ```yaml
 - device_type: cisco_ios
-  host: sandbox-iosxe-latest-1.cisco.com
+  host: ://cisco.com
   username: admin
   password: C1sco12345
   secret: C1sco12345
@@ -19,66 +16,70 @@ Ce fichier centralise les paramètres d'accès SSH pour le routeur Cisco Devnet 
 
 ---
 
-## 3. Script d'Automatisation et de Gestion des Erreurs (task_18_automation.py)
-Ce script implémente une gestion robuste des exceptions pour intercepter les pannes réseau ou les erreurs d'identification.
+## 2. Résolution des Tâches (Tasks)
 
-```python
-# -*- coding: utf-8 -*-
-import yaml
-from netmiko import ConnectHandler
-from netmiko.exceptions import NetmikoAuthenticationException, NetmikoTimeoutException
-
-def send_show_command(device, command):
-    try:
+### Tâche 18.1 : Création de la fonction de base `send_show_command`
+**Objectif :** Développer une fonction qui se connecte via SSH à un seul équipement et renvoie la sortie d'une commande de type `SHOW` [1.112].
+*   **Fichier source :** `task_18_1.py`
+*   **Code source implémenté :**
+    ```python
+    def send_show_command(device, command):
         with ConnectHandler(**device) as ssh:
-            try:
-                ssh.enable()
-            except Exception:
-                pass
+            ssh.enable()
             return ssh.send_command(command)
-    except NetmikoAuthenticationException:
-        print(f"[{device.get('host')}] Erreur: Échec d'authentification (Vérifier le mot de passe).")
-        return ""
-    except NetmikoTimeoutException:
-        print(f"[{device.get('host')}] Erreur: L'équipement n'est pas joignable (Timeout).")
-        return ""
-
-def send_config_commands(device, config_commands, log=True):
-    if log:
-        print(f"Connecting to {device.get('host')}...")
-    try:
-        with ConnectHandler(**device) as ssh:
-            try:
-                ssh.enable()
-            except Exception:
-                pass
-            return ssh.send_config_set(config_commands)
-    except (NetmikoAuthenticationException, NetmikoTimeoutException) as error:
-        print(f"[{device.get('host')}] Impossible d'exécuter la configuration: {error}")
-        return ""
-
-if __name__ == "__main__":
-    show_cmd = "show ip interface brief"
-    with open("devices.yaml") as f:
-        devices_list = yaml.safe_load(f)
-        
-    print("=== Exécution de la Task 18.1 (Show Command) ===")
-    for dev in devices_list:
-        send_show_command(dev, show_cmd)
-
-    print("\n============================================================\n")
-    print("=== Exécution de la Task 18.2 (Configuration Commands) ===")
-    cfg_cmds = ['logging buffered 20010', 'no logging console']
-    for dev in devices_list:
-        send_config_commands(dev, cfg_cmds, log=True)
-```
+    ```
 
 ---
 
-## 4. Analyse des Résultats d'Exécution
-Conformément aux exigences de la **Task 18.1a** et **Task 18.2**, le script intercepte correctement la levée de l'exception de sécurité lors d'une mauvaise combinaison de mot de passe ou d'un refus de session par le serveur distant.
+### Tâche 18.1a : Gestion de l'exception d'authentification
+**Objectif :** Intercepter et gérer spécifiquement l'exception levée lors d'un échec d'authentification [1.112].
+*   **Fichier source :** `task_18_1a.py`
+*   **Code source implémenté :**
+    ```python
+    except NetmikoAuthenticationException:
+        print(f"[{device.get('host')}] Erreur: Échec d'authentification (Vérifier le mot de passe).")
+    ```
 
-Le programme ne plante pas et redirige proprement le message d'alerte personnalisé vers la sortie standard (*stdout*), prouvant la viabilité du bloc algorithmique `try-except`.
+---
 
-**Capture d'écran de la validation du script (Erreur capturée) :**
-![Validation Netmiko Exception](images/task_18_output.png)
+### Tâche 18.1b : Gestion complète des exceptions (Authentification & Timeout)
+**Objectif :** Intercepter également l'exception provoquée lorsque l'adresse IP de l'équipement cible n'est pas joignable [1.112].
+*   **Fichier source :** `task_18_1b.py`
+*   **Code source implémenté :**
+    ```python
+    except NetmikoTimeoutException:
+        print(f"[{device.get('host')}] Erreur: L'équipement n'est pas joignable (Timeout réseau).")
+    ```
+
+---
+
+### Tâche 18.2 : Création de la fonction de configuration `send_config_commands`
+**Objectif :** Développer une fonction capable d'appliquer une liste de commandes en mode de configuration globale [1.113].
+*   **Fichier source :** `task_18_2.py`
+*   **Code source implémenté :**
+    ```python
+    def send_config_commands(device, config_commands):
+        with ConnectHandler(**device) as ssh:
+            ssh.enable()
+            return ssh.send_config_set(config_commands)
+    ```
+
+---
+
+### Tâche 18.2a : Ajout du paramètre de journalisation `log`
+**Objectif :** Ajouter un paramètre booléen facultatif `log` pour contrôler l'affichage de la tentative de connexion [1.114].
+*   **Fichier source :** `task_18_2a.py`
+*   **Code source implémenté :**
+    ```python
+    def send_config_commands(device, config_commands, log=True):
+        if log:
+            print(f"Connecting to {device.get('host')}...")
+    ```
+
+---
+
+## 3. Conclusion et Validation Visuelle
+L'ensemble des exigences du TP a été implémenté avec succès [1.112]. Les structures `try-except` garantissent la stabilité des scripts d'automatisation face aux perturbations de l'infrastructure réseau [1.112].
+
+**Capture d'écran globale d'exécution des tâches :**
+![Validation d'exécution des Tasks Terminal](images/task_18_output.png)
